@@ -335,12 +335,13 @@ namespace uvpx
         if (m_decoderData.img == nullptr)
             return;
 
-        //const int w = m_decoderData.img->d_w;
+        const int w = m_decoderData.img->d_w;
         const int h = m_decoderData.img->d_h;
-        //const int w2 = w / 2;
         const int h2 = h / 2;
 
         Frame *curYUV = m_frameBuffer->lockWrite(time);
+        size_t yPitch = curYUV->yPitch();
+        size_t uvPitch = curYUV->uvPitch();
 
         unsigned char *y = curYUV->y();
         unsigned char *u = curYUV->u();
@@ -354,9 +355,33 @@ namespace uvpx
         const int stride_u = m_decoderData.img->stride[VPX_PLANE_U];
         const int stride_v = m_decoderData.img->stride[VPX_PLANE_V];
 
-        memcpy(y, src_y, stride_y * h);
-        memcpy(u, src_u, stride_u * h2);
-        memcpy(v, src_v, stride_v * h2);
+        if (yPitch == stride_y)
+        {
+            memcpy(y, src_y, stride_y * h);
+            memcpy(u, src_u, stride_u * h2);
+            memcpy(v, src_v, stride_v * h2);
+        }
+        else
+        {
+            for (int i_line = h; i_line--; )
+            {
+                memcpy(y, src_y, w);
+                src_y += stride_y;
+                y += yPitch;
+
+                if (i_line < h2)
+                {
+                    memcpy(u, src_u, w);
+                    memcpy(v, src_v, w);
+
+                    src_u += stride_u;
+                    src_v += stride_v;
+
+                    u += uvPitch;
+                    v += uvPitch;
+                }
+            }
+        }
 
         m_frameBuffer->unlockWrite();
     }
